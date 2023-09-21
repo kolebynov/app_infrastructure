@@ -1,0 +1,19 @@
+{
+    "tracing": {
+        "defaultLevel": "Info",
+        "layers": [
+            {
+                "writer": {
+                    "stdout": {}
+                }
+            },
+            {
+                "writer": {
+                    "rollingFile": {
+                        "logPath": "examples/test.log"
+                    }
+                }
+            }
+        ]
+    }
+}
