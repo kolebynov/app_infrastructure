@@ -1,9 +1,10 @@
-use std::{fmt::Display, env};
+use std::{env, fmt::Display};
 
-use config::{Config, ConfigError, Environment, File, ConfigBuilder, builder::DefaultState};
+use config::{builder::DefaultState, Config, ConfigBuilder, ConfigError, Environment, File};
 
-const APP_ENVIRONMENT_KEY: &str = "RUST_APP_ENVIRONMENT";
+const APP_ENVIRONMENT_KEY: &str = "ENVIRONMENT";
 const DEFAULT_ENVIRONMENT: AppEnvironment = AppEnvironment::Dev;
+const DEFAULT_ENV_PREFIX: &str = "RUST_APP";
 
 #[derive(Clone)]
 pub enum AppEnvironment {
@@ -33,47 +34,69 @@ impl From<&str> for AppEnvironment {
 }
 
 pub struct AppConfigurationBuilder {
-    config_builder: ConfigBuilder<DefaultState>,
-    app_environment: AppEnvironment,
+    env_prefix: String,
+}
+
+pub struct ConfigBuildingInfo {
+    pub app_environment: AppEnvironment,
+    pub env_prefix: String,
 }
 
 impl AppConfigurationBuilder {
     pub fn new() -> Self {
         Self {
-            config_builder: Config::builder(),
-            app_environment: get_app_environment(),
+            env_prefix: DEFAULT_ENV_PREFIX.to_string(),
         }
     }
 
-    pub fn configure_config_builder(self, configurator: impl FnOnce(ConfigBuilder<DefaultState>, AppEnvironment) -> ConfigBuilder<DefaultState>) -> Self {
-        Self {
-            config_builder: configurator(self.config_builder, self.app_environment.clone()),
-            ..self
-        }
+    pub fn with_custom_env_prefix(self, env_prefix: String) -> Self {
+        Self { env_prefix }
+    }
+
+    pub fn build_with_custom_config_builder(
+        self,
+        configurator: impl FnOnce(ConfigBuildingInfo) -> ConfigBuilder<DefaultState>,
+    ) -> Result<AppConfiguration, ConfigError> {
+        let app_environment = get_app_environment(&self.env_prefix);
+        let config = configurator(ConfigBuildingInfo {
+            app_environment: app_environment.clone(),
+            env_prefix: self.env_prefix,
+        })
+        .build()?;
+
+        Ok(AppConfiguration {
+            app_environment,
+            config,
+        })
     }
 
     pub fn build(self) -> Result<AppConfiguration, ConfigError> {
-        Ok(AppConfiguration {
-            app_environment: self.app_environment,
-            config: self.config_builder.build()?,
+        self.build_with_custom_config_builder(|info| {
+            Config::builder()
+                .add_source(File::with_name("app_settings").required(false))
+                .add_source(
+                    File::with_name(&format!("app_settings.{}", info.app_environment))
+                        .required(false),
+                )
+                .add_source(
+                    Environment::with_prefix(&info.env_prefix)
+                        .try_parsing(true)
+                        .separator("."),
+                )
         })
     }
 }
 
 impl Default for AppConfigurationBuilder {
     fn default() -> Self {
-        AppConfigurationBuilder::new()
-            .configure_config_builder(|builder, app_env| {
-                builder
-                    .add_source(File::with_name("app_settings").required(false))
-                    .add_source(File::with_name(&format!("app_settings.{}", app_env)).required(false))
-                    .add_source(Environment::default())
-            })
+        Self::new()
     }
 }
 
-fn get_app_environment() -> AppEnvironment {
-    env::var(APP_ENVIRONMENT_KEY).map(|s| s.as_str().into()).unwrap_or(DEFAULT_ENVIRONMENT)
+fn get_app_environment(prefix: &str) -> AppEnvironment {
+    env::var(format!("{prefix}{}", APP_ENVIRONMENT_KEY))
+        .map(|s| s.as_str().into())
+        .unwrap_or(DEFAULT_ENVIRONMENT)
 }
 
 pub struct AppConfiguration {

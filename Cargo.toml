@@ -1,12 +1,20 @@
 [package]
 name = "app_infrastructure"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [features]
 default = ["config_json"]
 app_tracing = ["dep:tracing", "dep:tracing-appender", "dep:tracing-subscriber"]
-tonic = ["dep:bytes", "dep:http", "dep:http-body", "dep:hyper", "dep:tonic", "dep:tower-layer", "dep:tower-service"]
+tonic = [
+    "dep:bytes",
+    "dep:http",
+    "dep:http-body",
+    "dep:hyper",
+    "dep:tonic",
+    "dep:tower-layer",
+    "dep:tower-service",
+]
 config_toml = ["config/toml"]
 config_json = ["config/json"]
 config_yaml = ["config/yaml"]

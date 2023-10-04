@@ -1,6 +1,6 @@
 {
     "tracing": {
-        "defaultLevel": "Info",
+        "default_level": "Info",
         "layers": [
             {
                 "writer": {
@@ -9,8 +9,8 @@
             },
             {
                 "writer": {
-                    "rollingFile": {
-                        "logPath": "examples/test.log"
+                    "rolling_file": {
+                        "log_path": "examples/test.log"
                     }
                 }
             }
