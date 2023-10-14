@@ -6,16 +6,15 @@ use std::{
 use config::{Config, ConfigError};
 use serde::{
     de::{Unexpected, Visitor},
-    Deserialize, Deserializer,
+    Deserialize,
 };
-use tracing::Level;
 use tracing_appender::rolling::RollingFileAppender;
 use tracing_subscriber::{
     filter::LevelFilter,
     fmt::{format, FormatEvent, FormatFields, MakeWriter},
     prelude::__tracing_subscriber_SubscriberExt,
     util::SubscriberInitExt,
-    Layer, Registry,
+    EnvFilter, Layer, Registry,
 };
 
 use crate::BoxError;
@@ -88,28 +87,80 @@ pub enum WriterConfig {
     RollingFile(RollingFileWriterConfig),
 }
 
+pub struct EnvFilterWrapper(pub EnvFilter, pub String);
+
+impl<'de> Deserialize<'de> for EnvFilterWrapper {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct EnvFilterWrapperVisitor;
+
+        impl<'a> Visitor<'a> for EnvFilterWrapperVisitor {
+            type Value = EnvFilterWrapper;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(
+                    formatter,
+                    "an array of values in EnvFilter format \"target[span{{field=value}}]=level\""
+                )
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'a>,
+            {
+                let mut filter_str = String::new();
+                while let Some(str) = seq.next_element::<String>()? {
+                    filter_str.push_str(&str);
+                    filter_str.push(',');
+                }
+
+                if !filter_str.is_empty() {
+                    filter_str.remove(filter_str.len() - 1);
+                }
+
+                let filter = EnvFilter::try_new(&filter_str).map_err(|err| {
+                    serde::de::Error::invalid_value(
+                        Unexpected::Str(&filter_str),
+                        &err.to_string().as_ref(),
+                    )
+                })?;
+
+                Ok(EnvFilterWrapper(filter, filter_str))
+            }
+        }
+
+        deserializer.deserialize_seq(EnvFilterWrapperVisitor)
+    }
+}
+
+impl Default for EnvFilterWrapper {
+    fn default() -> Self {
+        Self(
+            EnvFilter::new("").add_directive(LevelFilter::INFO.into()),
+            String::default(),
+        )
+    }
+}
+
+impl Clone for EnvFilterWrapper {
+    fn clone(&self) -> Self {
+        Self(EnvFilter::new(&self.1), self.1.clone())
+    }
+}
+
 #[derive(Deserialize)]
 pub struct LayerConfig {
     #[serde(default)]
-    #[serde(deserialize_with = "deserialize_level_option")]
-    pub level: Option<Level>,
+    pub filter: Option<EnvFilterWrapper>,
     pub writer: WriterConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 pub struct TracingConfig {
-    #[serde(deserialize_with = "deserialize_level")]
-    pub default_level: Level,
+    pub filter: EnvFilterWrapper,
     pub layers: Option<Vec<LayerConfig>>,
-}
-
-impl Default for TracingConfig {
-    fn default() -> Self {
-        Self {
-            default_level: Level::INFO,
-            layers: Default::default(),
-        }
-    }
 }
 
 pub fn init_from_config(config: &Config) -> Result<(), BoxError> {
@@ -121,16 +172,17 @@ pub fn init_from_config(config: &Config) -> Result<(), BoxError> {
         }
     })?;
 
-    let default_level = logging_config.default_level;
+    let default_level = logging_config.filter;
 
     let mut layers = vec![];
     for layer_config in logging_config.layers.unwrap_or(vec![]) {
-        let level_filter = LevelFilter::from_level(layer_config.level.unwrap_or(default_level));
+        let filter = layer_config
+            .filter
+            .unwrap_or_else(|| default_level.clone())
+            .0;
         let layer = match layer_config.writer {
-            WriterConfig::Stdout(stdout_config) => configure_layer(stdout_config, level_filter),
-            WriterConfig::RollingFile(rolling_config) => {
-                configure_layer(rolling_config, level_filter)
-            }
+            WriterConfig::Stdout(stdout_config) => configure_layer(stdout_config, filter),
+            WriterConfig::RollingFile(rolling_config) => configure_layer(rolling_config, filter),
         };
 
         layers.push(layer?);
@@ -143,55 +195,10 @@ pub fn init_from_config(config: &Config) -> Result<(), BoxError> {
 
 fn configure_layer(
     configurator: impl LayerConfigurator,
-    level_filter: LevelFilter,
+    filter: EnvFilter,
 ) -> Result<Box<dyn Layer<Registry> + Send + Sync>, BoxError> {
     Ok(configurator
         .configure(FmtLayer::default())?
-        .with_filter(level_filter)
+        .with_filter(filter)
         .boxed())
-}
-
-fn deserialize_level<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Level, D::Error> {
-    Ok(deserialize_level_option(deserializer)?.unwrap())
-}
-
-fn deserialize_level_option<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Option<Level>, D::Error> {
-    struct LevelVisitor {}
-
-    impl<'de> Visitor<'de> for LevelVisitor {
-        type Value = Option<Level>;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(formatter, "This Visitor expects to receive string")
-        }
-
-        fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
-            Ok(None)
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            let level = match value {
-                "Trace" => Level::TRACE,
-                "Debug" => Level::DEBUG,
-                "Info" => Level::INFO,
-                "Warn" => Level::WARN,
-                "Error" => Level::ERROR,
-                _ => {
-                    return Err(serde::de::Error::invalid_value(
-                        Unexpected::Str(value),
-                        &"Correct log level",
-                    ))
-                }
-            };
-
-            Ok(Some(level))
-        }
-    }
-
-    deserializer.deserialize_str(LevelVisitor {})
 }

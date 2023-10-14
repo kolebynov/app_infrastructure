@@ -1,6 +1,10 @@
 {
     "tracing": {
-        "default_level": "Info",
+        "filter": [
+            "trace",
+            "tracing::debug=debug",
+            "tracing::info=info"
+        ],
         "layers": [
             {
                 "writer": {

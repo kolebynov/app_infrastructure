@@ -1,6 +1,6 @@
 [package]
 name = "app_infrastructure"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [features]
@@ -34,7 +34,10 @@ tower-layer = { version = "0.3", optional = true }
 tower-service = { version = "0.3", optional = true }
 tracing = { version = "0.1", optional = true }
 tracing-appender = { version = "0.2", optional = true }
-tracing-subscriber = { version = "0.3", optional = true }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+], optional = true }
 
 [[example]]
 name = "tracing"
+required-features = ["app_tracing"]

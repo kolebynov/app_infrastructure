@@ -1,6 +1,30 @@
 use app_infrastructure::{app_config::AppConfigurationBuilder, app_tracing, BoxError};
 use config::{Config, Environment, File};
-use tracing::{debug, error, info, trace, warn};
+use tracing::*;
+
+mod debug {
+    use tracing::*;
+
+    pub fn log_messages() {
+        trace!("Trace");
+        debug!("Debug");
+        info!("Info");
+        warn!("Warn");
+        error!("Error");
+    }
+}
+
+mod info {
+    use tracing::*;
+
+    pub fn log_messages() {
+        trace!("Trace");
+        debug!("Debug");
+        info!("Info");
+        warn!("Warn");
+        error!("Error");
+    }
+}
 
 fn main() -> Result<(), BoxError> {
     let app_config = AppConfigurationBuilder::new().build_with_custom_config_builder(|info| {
@@ -19,6 +43,9 @@ fn main() -> Result<(), BoxError> {
     info!("Info");
     warn!("Warn");
     error!("Error");
+
+    debug::log_messages();
+    info::log_messages();
 
     Ok(())
 }
