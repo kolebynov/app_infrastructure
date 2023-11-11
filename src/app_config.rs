@@ -6,7 +6,7 @@ const APP_ENVIRONMENT_KEY: &str = "ENVIRONMENT";
 const DEFAULT_ENVIRONMENT: AppEnvironment = AppEnvironment::Dev;
 const DEFAULT_ENV_PREFIX: &str = "RUST_APP";
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AppEnvironment {
     Dev,
     Prod,
