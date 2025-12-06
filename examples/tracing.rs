@@ -1,4 +1,4 @@
-use app_infrastructure::{app_config::AppConfigurationBuilder, app_tracing, BoxError};
+use app_infrastructure::{BoxError, app_config::AppConfigurationBuilder, app_tracing};
 use config::{Config, Environment, File};
 use tracing::*;
 
@@ -33,7 +33,7 @@ fn main() -> Result<(), BoxError> {
             .add_source(
                 Environment::with_prefix(&info.env_prefix)
                     .try_parsing(true)
-                    .separator("."),
+                    .separator(&info.env_separator),
             )
     })?;
     app_tracing::init_from_config(&app_config.config)?;
