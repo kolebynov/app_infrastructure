@@ -93,7 +93,8 @@ impl AppConfigurationBuilder {
                 .add_source(
                     Environment::with_prefix(&info.env_prefix)
                         .try_parsing(true)
-                        .separator(&info.env_separator),
+                        .separator(&info.env_separator)
+                        .prefix_separator("_"),
                 )
         })
     }

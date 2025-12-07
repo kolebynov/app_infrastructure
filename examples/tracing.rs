@@ -31,12 +31,15 @@ fn main() -> Result<(), BoxError> {
         Config::builder()
             .add_source(File::with_name("examples/app_settings"))
             .add_source(
-                Environment::with_prefix(&info.env_prefix)
+                Environment::with_prefix("EXAMPLE")
                     .try_parsing(true)
-                    .separator(&info.env_separator),
+                    .separator("__")
+                    .prefix_separator("_"),
             )
     })?;
     app_tracing::init_from_config(&app_config.config)?;
+
+    info!("Config value: {:?}", app_config.config.get_string("config.value"));
 
     trace!("Trace");
     debug!("Debug");
