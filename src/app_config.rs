@@ -6,6 +6,7 @@ const APP_ENVIRONMENT_KEY: &str = "ENVIRONMENT";
 const DEFAULT_ENVIRONMENT: AppEnvironment = AppEnvironment::Dev;
 const DEFAULT_ENV_PREFIX: &str = "RUST_APP";
 const DEFAULT_ENV_SEPARATOR: &str = "__";
+const DEFAULT_ENV_PREFIX_SEPARATOR: &str = "_";
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AppEnvironment {
@@ -94,7 +95,7 @@ impl AppConfigurationBuilder {
                     Environment::with_prefix(&info.env_prefix)
                         .try_parsing(true)
                         .separator(&info.env_separator)
-                        .prefix_separator("_"),
+                        .prefix_separator(DEFAULT_ENV_PREFIX_SEPARATOR),
                 )
         })
     }
@@ -107,9 +108,11 @@ impl Default for AppConfigurationBuilder {
 }
 
 fn get_app_environment(prefix: &str) -> AppEnvironment {
-    env::var(format!("{prefix}{}", APP_ENVIRONMENT_KEY))
-        .map(|s| s.as_str().into())
-        .unwrap_or(DEFAULT_ENVIRONMENT)
+    env::var(format!(
+        "{prefix}{DEFAULT_ENV_PREFIX_SEPARATOR}{APP_ENVIRONMENT_KEY}"
+    ))
+    .map(|s| s.as_str().into())
+    .unwrap_or(DEFAULT_ENVIRONMENT)
 }
 
 pub struct AppConfiguration {
