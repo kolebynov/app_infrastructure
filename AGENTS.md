@@ -59,6 +59,8 @@ Use Rust and Cargo, not Node or Bun. The crate uses Rust edition 2024, requiring
 
 Default features enable only `config_json`. Tracing requires `app_tracing`; additional format features are `config_toml`, `config_yaml`, `config_ini`, `config_ron`, and `config_json5`. To select a format without JSON, use, for example, `cargo build --no-default-features --features config_toml`.
 
+For dependency refreshes, update direct dependency requirements in `Cargo.toml` to the latest stable releases, then run `cargo update` to refresh transitive dependencies within their upstream constraints. Preserve optional dependency and file-format feature isolation.
+
 ## Testing & QA
 
 No unit tests, integration tests, doctests, CI workflows, or coverage thresholds are currently present. Cargo's standard test harness is the applicable framework; a successful `cargo test` alone does not prove behavior when there are no tests.
